@@ -1,0 +1,12 @@
+# 虚拟环境
+.venv/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 密钥(真实 key 绝不可入库;.env.example 模板要入库)
+.env
+
+# 系统文件
+.DS_Store
