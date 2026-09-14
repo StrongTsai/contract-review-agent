@@ -2,8 +2,19 @@ import argparse
 
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
+from pathlib import Path
 
 from graph import app
+from ocr import extract_text
+
+
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
+
+def load_contract_text(path: str):
+    if Path(path).suffix.lower() in IMAGE_EXTS:
+        return extract_text(path)
+    with open(path, encoding="utf-8") as f:
+        return f.read()
 
 
 def review_contract(contract_text: str) -> str:
@@ -47,8 +58,7 @@ def main() -> None:
     if args.text:
         text = args.text
     elif args.file:
-        with open(args.file, encoding="utf-8") as f:
-            text = f.read()
+        text = load_contract_text(args.file)
     else:
         parser.error("请提供文件路径,或使用 --text 直接传入合同文本")
 

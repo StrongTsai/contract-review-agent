@@ -68,6 +68,12 @@ START → 抽取 → 审核 → 人工审批 ─(确认)→ 报告 → END
 - `interrupt` 挂起图、`Command(resume)` 把人工决定传回来,条件边据此路由「确认 → 报告 / 驳回 → 结束」。
 - **这是「人机协同」的治理点,不是技术炫技——它回答的是「AI 错了谁负责」。**
 
+### 2.9 为什么用 OCR(而不是轻量 VLM)做「眼睛」
+- 轻量 VLM(Qwen2.5-VL / MiniCPM-V)能「看 + 懂」一步到位,但它倾向**理解后转述**而非**忠实转录**——合同里「千分之五」被 VLM 换算成「0.5%」或漏一个字,就是法律事故。
+- OCR 是确定性的,逐字转录、零幻觉。而「转录(写了什么)」和「推理(有没有风险)」是两件事,各选最合适的:转录用 OCR、推理用 DeepSeek。
+- VLM 不是替代,是补充——以后要「识别印章/表格/手写」这类视觉理解,再上 VLM 与 OCR 并行。
+- **一句话:知道什么时候用哪个,本身就是架构能力。**
+
 ---
 
 ## 3. 高频追问 + 答法
@@ -106,8 +112,10 @@ START → 抽取 → 审核 → 人工审批 ─(确认)→ 报告 → END
 - 已接 **LangSmith 追踪**,能按项目/会话看 token 和成本。
 - 手段:`temperature=0`(审核要确定性)、`thinking` 关闭、top_k 控制检索注入量、必要时历史消息摘要。
 
-### 3.9 「怎么扩展到多模态?」
-- 我的架构主线是「**OCR 当眼睛 + DeepSeek 当大脑**」:DeepSeek 无视觉能力,所以用本地 OCR(PaddleOCR / macOS Vision)把扫描件/PDF 转文本,再走现有流程。
+### 3.9 「怎么扩展到多模态?」(已落地)
+- 已用 **RapidOCR**(ONNX Runtime 跑 PaddleOCR 同款模型)把扫描件/图片转文本,再走现有四节点流程——「OCR 当眼睛 + DeepSeek 当大脑」。
+- 选 RapidOCR 而非 PaddleOCR / macOS Vision:PaddleOCR 中文最强但 paddlepaddle 在 Apple Silicon 难装又重;macOS Vision 零依赖但 Mac-only、无干净 Python API;RapidOCR 一行 `uv add`、跨平台、中文同精度。
+- OCR 输出有噪声(换行处数字切开、标点偶尔丢),但下游 DeepSeek 天然抗噪、能重建语义——实测 `10%` 被切两行仍被正确归一。**转录交给 OCR,理解交给 LLM,各干各擅长的。**
 - 这是**异构多模型**思路——不同任务用最合适的模型,而不是指望一个大模型包打天下。
 
 ---
@@ -122,18 +130,21 @@ START → 抽取 → 审核 → 人工审批 ─(确认)→ 报告 → END
 | 工作流 | 4 节点 + 条件边 + 断点续跑 |
 | 审核 agent | create_agent + 2 工具 + response_format |
 | 模型 | DeepSeek,thinking 关闭,temperature=0 |
+| OCR | RapidOCR(ONNX + PP-OCR 模型),本地 |
 
 ---
 
 ## 5. 复盘:哪些是「决策」,哪些还是「债务」
 
 **决策(能讲出理由,加分)**:
-向量 vs 关键词、本地 embedding vs OpenAI、法条原文 vs 裁判规则、工作流 + 嵌套 agent、create_agent vs 手搓、response_format 策略、interrupt 转人工。
+向量 vs 关键词、本地 embedding vs OpenAI、法条原文 vs 裁判规则、工作流 + 嵌套 agent、create_agent vs 手搓、response_format 策略、interrupt 转人工、OCR vs VLM(眼睛选忠实转录)、RapidOCR vs PaddleOCR/macOS Vision。
 
 **债务(主动承认 + 说明下一步,反而加分)**:
 - 检索还没上 rerank / 混合检索 → 下一步。
 - 向量没持久化(每次启动重 embed 2.4s)→ 规模上来再做。
 - checkpointer 还是内存版 → 多用户换 Postgres。
 - 语料来源是第三方 GitHub,未对照官方库逐条复核 → 生产前必须核验。
+- OCR 还没做「版面还原」(换行处数字会切开,现在靠 LLM 归一化)→ 多栏/表格/盖章场景再做。
+- 只支持图片,不支持 PDF(合同多为 PDF)→ 下一步加 fitz 栅格化。
 
 > 面试里被问「还有什么没做」,不要慌:把债务**当成「我知道下一步是什么」的证据**来讲,而不是「我没做完」的包袱。

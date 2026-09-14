@@ -43,6 +43,16 @@
   - 位置参数 `parser.add_argument("file", nargs="?")` —— `?` 表示可缺省;
   - 可选参数 `parser.add_argument("--text")` —— 带 `--` 前缀,传值时写 `--text "..."`。
 
+### `f()(x)` 双括号调用(可调用对象 / `__call__`)
+- **是什么**:两次调用叠在一起写。`get_ocr_engine()(image_path)` = 先 `get_ocr_engine()` 拿到实例,再 `(image_path)` 调用这个实例。所以 `(image_path)` **不是** `get_ocr_engine` 的参数,而是调用它的**返回值**。
+- **为什么实例能被「调用」**:Python 里一个对象的类定义了 `__call__` 方法,这个对象就「可调用」——`obj(x)` 等价 `obj.__call__(x)`。RapidOCR 就是这种设计,把实例做得像函数:
+  ```python
+  engine = RapidOCR()   # __init__:建实例、加载模型
+  result = engine(img)  # __call__:真正的识别逻辑
+  ```
+- **对照已有的**:`get_embedder().encode(x)` 是「方法调用」(实例 `.` 方法);`get_ocr_engine()(x)` 是「实例调用」(实例有 `__call__`)。本质都是「先拿实例、再用它」,一个走方法、一个走 `__call__`。
+- **可读性**:双括号难读,拆两行更清楚:`engine = get_ocr_engine()` → `result = engine(image_path)`。
+
 ## LangChain / LangGraph
 
 ### `MessagesState`(预定义消息状态)

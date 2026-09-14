@@ -10,6 +10,7 @@ dependencies = [
     "pydantic",
     "python-dotenv",
     "sentence-transformers>=6.0.1",
-    "faiss-cpu>=1.15.0",
     "langchain>=1.4.0",
+    "rapidocr>=3.9.2",
+    "onnxruntime>=1.30.0",
 ]
