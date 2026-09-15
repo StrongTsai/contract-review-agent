@@ -7,10 +7,10 @@ from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 from functools import cache
 
-from llm import get_model
-from prompts import EXTRACT_SYSTEM, REVIEW_SYSTEM
-from schemas import ContractInfo, ReviewResult
-from tools import search_law, query_case
+from contract_review.llm import get_model
+from contract_review.prompts import EXTRACT_SYSTEM, REVIEW_SYSTEM
+from contract_review.schemas import ContractInfo, ReviewResult
+from contract_review.tools import search_law, query_case
 
 
 class ContractState(MessagesState, total=False):

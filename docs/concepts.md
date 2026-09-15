@@ -53,7 +53,14 @@
 - **对照已有的**:`get_embedder().encode(x)` 是「方法调用」(实例 `.` 方法);`get_ocr_engine()(x)` 是「实例调用」(实例有 `__call__`)。本质都是「先拿实例、再用它」,一个走方法、一个走 `__call__`。
 - **可读性**:双括号难读,拆两行更清楚:`engine = get_ocr_engine()` → `result = engine(image_path)`。
 
-## LangChain / LangGraph
+### 相对导入 `from .x` vs 绝对导入 `from pkg.x`
+- **两种都合法,主流用绝对导入**:`from .settings import X` 的 `.` = 「当前包」;`from contract_review.settings import X` 写全路径。
+- **谁推荐**:PEP 8 说「绝对导入更可读、行为更好,推荐」;Google Python 风格指南明确「不用相对导入」。Django / Flask / FastAPI 源码里几乎都是绝对导入。
+- **各自适用**:
+  - 相对导入:大型库内部(深嵌套、常改包名),`.` 省事且改名不动 import。
+  - 绝对导入:绝大多数项目,一眼看出模块从哪来、可 grep。
+- **这个项目用绝对导入**:包小、图可读性、跟主流一致。
+- **坑**:相对导入下直接 `python src/xxx/main.py` 会报 `attempted relative import with no known parent package`;绝对导入没这问题。
 
 ### `MessagesState`(预定义消息状态)
 - **从哪来**:`from langgraph.graph import MessagesState`(你在 graph.py 已 import)。

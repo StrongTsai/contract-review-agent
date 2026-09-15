@@ -1,9 +1,10 @@
 import json
 from functools import cache
-from pathlib import Path
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
+from contract_review.settings import PROJECT_ROOT
 
 
 CASE_SUMMARIES = [
@@ -23,7 +24,7 @@ CASE_SUMMARIES = [
 
 
 def _load_civil_code():
-    path = Path(__file__).parent / "data" / "civil_code.jsonl"
+    path = PROJECT_ROOT / "data" / "civil_code.jsonl"
     with open(path, encoding="utf-8") as f:
         rows = [json.loads(line) for line in f]
     return [{"title": f"《民法典》{r['article_number']}", "content": r["content"]} for r in rows]

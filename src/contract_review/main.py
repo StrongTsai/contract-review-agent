@@ -4,8 +4,8 @@ from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from pathlib import Path
 
-from graph import app
-from ocr import extract_text, extract_text_from_pdf
+from contract_review.graph import app
+from contract_review.ocr import extract_text, extract_text_from_pdf
 
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}

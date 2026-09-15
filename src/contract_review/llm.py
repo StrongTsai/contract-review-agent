@@ -1,6 +1,6 @@
 from functools import cache
 from langchain_openai import ChatOpenAI
-from settings import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+from contract_review.settings import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 
 @cache
 def get_model() -> ChatOpenAI:

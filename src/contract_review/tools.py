@@ -1,5 +1,5 @@
 from langchain_core.tools import tool
-from knowledge import CASE_STORE, LAW_STORE, format_hits
+from contract_review.knowledge import CASE_STORE, LAW_STORE, format_hits
 
 from typing import Annotated
 from pydantic import Field
