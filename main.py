@@ -5,13 +5,16 @@ from langgraph.types import Command
 from pathlib import Path
 
 from graph import app
-from ocr import extract_text
+from ocr import extract_text, extract_text_from_pdf
 
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
 
 def load_contract_text(path: str):
-    if Path(path).suffix.lower() in IMAGE_EXTS:
+    suffix = Path(path).suffix.lower()
+    if suffix == ".pdf":
+        return extract_text_from_pdf(path)
+    if suffix in IMAGE_EXTS:
         return extract_text(path)
     with open(path, encoding="utf-8") as f:
         return f.read()

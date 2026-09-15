@@ -96,6 +96,6 @@ cp .env.example .env   # 然后填入真实 DEEPSEEK_API_KEY 与 LANGCHAIN_API_K
 
 1. ~~RAG 知识库 + 工具调用(agent 化)~~ ✅ 已完成:review 节点内嵌 create_agent,自主查证。
 2. ~~OCR 接入~~ ✅ 已完成:RapidOCR(ONNX 跑 PP-OCR 模型)本地识别图片。
-3. PDF 支持(合同多为 PDF,需 fitz/PyMuPDF 栅格化后再 OCR)。
+3. ~~PDF 支持~~ ✅ 已完成:fitz/PyMuPDF 栅格化 → OCR,端到端跑通 contract.pdf。
 4. supervisor 多智能体。
 5. LangSmith 追踪的 token/成本分析。

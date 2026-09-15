@@ -13,4 +13,5 @@ dependencies = [
     "langchain>=1.4.0",
     "rapidocr>=3.9.2",
     "onnxruntime>=1.30.0",
+    "pymupdf>=1.28.2",
 ]

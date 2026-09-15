@@ -113,7 +113,7 @@ START → 抽取 → 审核 → 人工审批 ─(确认)→ 报告 → END
 - 手段:`temperature=0`(审核要确定性)、`thinking` 关闭、top_k 控制检索注入量、必要时历史消息摘要。
 
 ### 3.9 「怎么扩展到多模态?」(已落地)
-- 已用 **RapidOCR**(ONNX Runtime 跑 PaddleOCR 同款模型)把扫描件/图片转文本,再走现有四节点流程——「OCR 当眼睛 + DeepSeek 当大脑」。
+- 已用 **RapidOCR**(ONNX Runtime 跑 PaddleOCR 同款模型)把扫描件/图片/PDF 转文本(图片直接 OCR,PDF 先用 fitz/PyMuPDF 栅格化),再走现有四节点流程——「OCR 当眼睛 + DeepSeek 当大脑」。
 - 选 RapidOCR 而非 PaddleOCR / macOS Vision:PaddleOCR 中文最强但 paddlepaddle 在 Apple Silicon 难装又重;macOS Vision 零依赖但 Mac-only、无干净 Python API;RapidOCR 一行 `uv add`、跨平台、中文同精度。
 - OCR 输出有噪声(换行处数字切开、标点偶尔丢),但下游 DeepSeek 天然抗噪、能重建语义——实测 `10%` 被切两行仍被正确归一。**转录交给 OCR,理解交给 LLM,各干各擅长的。**
 - 这是**异构多模型**思路——不同任务用最合适的模型,而不是指望一个大模型包打天下。
@@ -145,6 +145,6 @@ START → 抽取 → 审核 → 人工审批 ─(确认)→ 报告 → END
 - checkpointer 还是内存版 → 多用户换 Postgres。
 - 语料来源是第三方 GitHub,未对照官方库逐条复核 → 生产前必须核验。
 - OCR 还没做「版面还原」(换行处数字会切开,现在靠 LLM 归一化)→ 多栏/表格/盖章场景再做。
-- 只支持图片,不支持 PDF(合同多为 PDF)→ 下一步加 fitz 栅格化。
+- PDF 走「栅格化 → OCR」,还没做「文本型 PDF 直接 `get_text()` 优先」优化 → 文本型合同 PDF 会白跑一遍 OCR,更慢。
 
 > 面试里被问「还有什么没做」,不要慌:把债务**当成「我知道下一步是什么」的证据**来讲,而不是「我没做完」的包袱。

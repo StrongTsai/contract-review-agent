@@ -62,5 +62,5 @@ START → extract_contract → review_risks → human_review ─(确认)─→ g
 - [x] 向量 RAG(全量民法典 + 判例)
 - [x] LangSmith 追踪
 - [x] OCR 接入(RapidOCR,本地图片识别)
-- [ ] PDF 支持(栅格化后再 OCR)
+- [x] PDF 支持(fitz/PyMuPDF 栅格化后再 OCR)
 - [ ] supervisor 多智能体

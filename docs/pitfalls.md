@@ -77,3 +77,9 @@
 - **根因**:OCR 返回的是「视觉行」,不是「段落」。图里 `10%` 恰好落在换行处,OCR 忠实地切成两个文本框;`"\n".join(result.txts)` 把这个视觉换行硬保留了。同理顿号 `、`、句号 `。` 偶尔丢,是标点识别本身不稳。
 - **解法**:v1 用 naive join 够——下游 LLM 抗噪,能把 `剩余1\n0%` 重建回「剩余10%」。真要「版面还原」(按标点重建段落、处理表格/多栏)再单独做,不在 OCR 后堆复杂规则。
 - **教训**:OCR 的「忠实转录」和「版面理解」是两件事;前者交给 OCR,后者交给 LLM 归一化,各干各擅长的。
+
+### 12. PyMuPDF 弃用 `fitz` 模块名,改 `import pymupdf`
+- **现象**:运行打印 `warning: The fitz API is deprecated... Use import pymupdf instead`。
+- **根因**:新版 PyMuPDF(1.28+)把模块名从 `fitz` 统一成 `pymupdf`,`fitz` 作为旧别名保留但已弃用。
+- **解法**:`import fitz` → `import pymupdf`;`fitz.open(...)` → `pymupdf.open(...)`。pip 包名和 import 名现在一致了。
+- **教训**:旧教程里 `import fitz` 是 PyMuPDF 的经典写法,现已换代;装完第三方库先看版本和弃用警告。
