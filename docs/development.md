@@ -1,21 +1,23 @@
 # 合同审核数字员工 · 开发文档
 
-> 版本 v1.2 · 2026-09-15
+> 版本 v1.3 · 2026-09-16
 
 ## 1. 项目结构
 
 ```
 contract-review-agent/
-├── settings.py    # 环境变量加载
-├── llm.py         # DeepSeek 模型单例
-├── schemas.py     # 结构化输出数据类
-├── prompts.py     # 两个 system prompt
-├── knowledge.py   # 全量民法典 + 判例语料 + 向量检索(VectorStore)
-├── tools.py       # search_law / query_case 检索工具
-├── ocr.py         # RapidOCR 图片识别(眼睛)
+├── src/
+│   └── contract_review/    # 包:所有源码(绝对导入)
+│       ├── settings.py     # 环境变量加载 + 项目根路径
+│       ├── llm.py          # DeepSeek 模型单例
+│       ├── schemas.py      # 结构化输出数据类
+│       ├── prompts.py      # 两个 system prompt
+│       ├── knowledge.py    # 全量民法典 + 判例语料 + 向量检索(VectorStore)
+│       ├── tools.py        # search_law / query_case 检索工具
+│       ├── ocr.py          # RapidOCR 图片识别(眼睛)
+│       ├── graph.py        # LangGraph 四节点图(含条件边 + checkpointer + 嵌套 agent)
+│       └── main.py         # CLI 入口(两阶段 invoke,处理中断/恢复)
 ├── data/          # 语料数据(civil_code.jsonl 民法典全文)
-├── graph.py       # LangGraph 四节点图(含条件边 + checkpointer + 嵌套 agent)
-├── main.py        # CLI 入口(两阶段 invoke,处理中断/恢复)
 ├── .env           # 真实密钥(不入库)
 ├── .env.example   # 密钥模板(占位符)
 ├── samples/       # 测试合同
@@ -50,9 +52,9 @@ cp .env.example .env   # 然后填入真实 DEEPSEEK_API_KEY 与 LANGCHAIN_API_K
 ## 4. 运行
 
 ```bash
-.venv/bin/python main.py samples/contract.txt          # 文本文件输入
-.venv/bin/python main.py samples/contract.png          # 图片输入(OCR 转文本)
-.venv/bin/python main.py --text "甲方乙方...合同正文"    # 直接传文本
+uv run python -m contract_review.main samples/contract.txt          # 文本文件输入
+uv run python -m contract_review.main samples/contract.png          # 图片输入(OCR 转文本)
+uv run python -m contract_review.main --text "甲方乙方...合同正文"   # 直接传文本
 ```
 
 有高危风险时会暂停、打印风险点、等待输入 `y/n`;`y` 出报告,`n` 打印「已驳回,未生成报告」。
@@ -61,7 +63,7 @@ cp .env.example .env   # 然后填入真实 DEEPSEEK_API_KEY 与 LANGCHAIN_API_K
 
 ```bash
 # 图编译验证
-.venv/bin/python -c "from graph import app; print(list(app.get_graph().nodes))"
+uv run python -c "from contract_review.graph import app; print(list(app.get_graph().nodes))"
 
 # 可观测性验证(需 LANGCHAIN_TRACING_V2=true)
 # 运行后到 smith.langchain.com 查看 contract-review-agent 项目的 trace
@@ -87,10 +89,11 @@ cp .env.example .env   # 然后填入真实 DEEPSEEK_API_KEY 与 LANGCHAIN_API_K
 - [x] 审核节点 agent 化:create_agent + search_law/query_case 工具,自主查证法条/判例
 - [x] 语料升级为全量《民法典》(1260 条原文,data/civil_code.jsonl 加载,语义检索验证通过)
 - [x] OCR 接入:ocr.py(RapidOCR)+ main.py 按扩展名分图片/文本输入,端到端跑通 samples/contract.png
+- [x] src layout 重构:代码归入 src/contract_review/ 包,绝对导入,`python -m contract_review.main` 入口
 
 ## 7. 踩坑记录
 
-详见 [`docs/pitfalls.md`](pitfalls.md)(独立维护,写代码遇坑主动追加)。已覆盖 11 条,新增:OCR 按视觉行吐文本、naive join 切开换行处(#11)。
+详见 [`docs/pitfalls.md`](pitfalls.md)(独立维护,写代码遇坑主动追加)。已覆盖 12 条,新增:OCR 按视觉行吐文本、naive join 切开换行处(#11)、PyMuPDF 弃用 fitz(#12)。
 
 ## 8. 后续开发计划
 

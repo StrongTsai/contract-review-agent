@@ -83,3 +83,9 @@
 - **根因**:新版 PyMuPDF(1.28+)把模块名从 `fitz` 统一成 `pymupdf`,`fitz` 作为旧别名保留但已弃用。
 - **解法**:`import fitz` → `import pymupdf`;`fitz.open(...)` → `pymupdf.open(...)`。pip 包名和 import 名现在一致了。
 - **教训**:旧教程里 `import fitz` 是 PyMuPDF 的经典写法,现已换代;装完第三方库先看版本和弃用警告。
+
+### 13. checkpointer 下裸 invoke 忘传 `thread_id`
+- **现象**:`app.invoke(...)` 报 `ValueError: Checkpointer requires one or more of the following 'configurable' keys: thread_id, checkpoint_ns, checkpoint_id`。
+- **根因**:图挂了 `MemorySaver` 后,每次 `invoke` 都要指定「存到哪个会话」(`configurable.thread_id`),不传就没法持久化。
+- **解法**:`app.invoke(state, config={"configurable": {"thread_id": "1"}})`。
+- **教训**:checkpointer 是「状态外置」,`thread_id` 就是会话隔离的键;多用户时每个用户一个 `thread_id`。这也是 `main.py` 里要传 `config` 的原因。

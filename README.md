@@ -15,32 +15,34 @@
 
 ```
 contract-review-agent/
-├── settings.py    # 读 .env 环境变量
-├── llm.py         # DeepSeek 模型单例(@cache)
-├── schemas.py     # Pydantic 结构化输出模型
-├── prompts.py     # 抽取 / 审核 system prompt
-├── knowledge.py   # 民法典 + 判例语料 + VectorStore 向量检索
-├── tools.py       # search_law / query_case 检索工具
-├── ocr.py         # RapidOCR 图片识别
-├── graph.py       # LangGraph 四节点图(嵌套 agent + 条件边 + checkpointer)
-├── main.py        # CLI 入口(两阶段 invoke,处理中断/恢复)
-├── data/          # civil_code.jsonl 民法典全文
-├── samples/       # 示例合同
-└── docs/          # 需求/设计/开发/踩坑/概念/面试话术
+├── src/
+│   └── contract_review/    # 包:所有源码
+│       ├── settings.py     # 读 .env 环境变量 + 项目根路径
+│       ├── llm.py          # DeepSeek 模型单例(@cache)
+│       ├── schemas.py      # Pydantic 结构化输出模型
+│       ├── prompts.py      # 抽取 / 审核 system prompt
+│       ├── knowledge.py    # 民法典 + 判例语料 + VectorStore 向量检索
+│       ├── tools.py        # search_law / query_case 检索工具
+│       ├── ocr.py          # RapidOCR 图片识别
+│       ├── graph.py        # LangGraph 四节点图(嵌套 agent + 条件边 + checkpointer)
+│       └── main.py         # CLI 入口(两阶段 invoke,处理中断/恢复)
+├── data/           # civil_code.jsonl 民法典全文
+├── samples/        # 示例合同
+└── docs/           # 需求/设计/开发/踩坑/概念/面试话术
 ```
 
 ## 快速开始
 
 ```bash
-uv sync                         # 安装依赖(uv 管理)
+uv sync                         # 安装依赖 + 构建包(uv 管理)
 cp .env.example .env            # 填入 DEEPSEEK_API_KEY
-uv run python main.py samples/contract.txt
+uv run python -m contract_review.main samples/contract.txt
 
 # 或直接传图片(OCR 转文本)
-uv run python main.py samples/contract.png
+uv run python -m contract_review.main samples/contract.png
 
 # 或直接传文本
-uv run python main.py --text "甲方委托乙方开发系统,乙方每逾期一日按合同总金额千分之五支付违约金。"
+uv run python -m contract_review.main --text "甲方委托乙方开发系统,乙方每逾期一日按合同总金额千分之五支付违约金。"
 ```
 
 ## 图结构

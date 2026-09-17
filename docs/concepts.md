@@ -53,6 +53,12 @@
 - **对照已有的**:`get_embedder().encode(x)` 是「方法调用」(实例 `.` 方法);`get_ocr_engine()(x)` 是「实例调用」(实例有 `__call__`)。本质都是「先拿实例、再用它」,一个走方法、一个走 `__call__`。
 - **可读性**:双括号难读,拆两行更清楚:`engine = get_ocr_engine()` → `result = engine(image_path)`。
 
+### 传函数 vs 调函数(`operator.add` 不加括号)
+- **`operator.add` 是「函数本身」,`operator.add()` 是「立刻调用它」**。`Annotated[list[T], operator.add]` 是把函数**交给** LangGraph 当回调,让它稍后用 `(旧值, 新值)` 去调,所以不能加括号。
+- **加了括号会怎样**:`operator.add()` 立刻执行,而 `add` 需要 2 个参数 → `TypeError`。
+- **你已经在用**:`add_conditional_edges("human_review", route_after_human, ...)` 里 `route_after_human` 也没加括号——同一个道理,把函数交给框架、框架稍后调。
+- **通用记法**:高阶函数/回调/装饰器,传的是「函数引用」(函数名不带括号),不是「调用结果」。类似 `sorted(x, key=len)`(不是 `len()`)、`@cache`。
+
 ### 相对导入 `from .x` vs 绝对导入 `from pkg.x`
 - **两种都合法,主流用绝对导入**:`from .settings import X` 的 `.` = 「当前包」;`from contract_review.settings import X` 写全路径。
 - **谁推荐**:PEP 8 说「绝对导入更可读、行为更好,推荐」;Google Python 风格指南明确「不用相对导入」。Django / Flask / FastAPI 源码里几乎都是绝对导入。
@@ -114,6 +120,14 @@ def search_law(keyword: str) -> str:
 ### `get_state` vs `get_state_history`
 - **`get_state(config)`**:当前状态,1 个快照——查「现在卡没卡、当前值是什么」。
 - **`get_state_history(config)`**:完整历史,N 个快照、最新在前——调试回溯、审计、时间旅行。
+
+### state 的 reducer(归约函数)—— 累积字段怎么「追加」不「覆盖」
+- **是什么**:LangGraph 里 state 字段默认「后写覆盖前写」(节点 B 的返回覆盖 A)。要「累积」(多个节点各自往里加),得给字段挂 reducer:`Annotated[list[T], 函数]`。
+- **为什么**:supervisor 里多个专家都要往 `findings` 加结果,普通字段会让后一个专家覆盖前一个,最后只剩一份。
+- **用什么**:
+  - 消息:`add_messages`(`from langgraph.graph.message import add_messages`,LangGraph 封装好的,`MessagesState` 在用)——消息要按 id 去重、支持 `RemoveMessage` 删除,逻辑复杂所以专门封装。
+  - 普通 list:`operator.add`(Python 标准库,把 `+` 变成函数,`operator.add([1],[2]) == [1,2]`)——LangGraph 官方多智能体示例里累积 findings/events 就是这么写的,不是自己手搓。
+- **本质**:reducer 就是函数 `(旧值, 新值) -> 合并结果`,`Annotated` 第二个参数传它。任何 callable 都行,`operator.add` 恰好是 list 拼接。
 
 ## 机器学习 / 向量基础
 
