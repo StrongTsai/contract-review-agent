@@ -10,6 +10,7 @@
 - **OCR 眼睛**:本地 `RapidOCR`(ONNX 跑 PP-OCR 模型)识别扫描件/图片 → 「OCR 当眼睛 + DeepSeek 当大脑」
 - **转人工**:高危风险用 `interrupt` 挂起,人工确认 / 驳回后走条件边路由
 - **结构化输出**:Pydantic 模型 + `response_format`(函数调用模拟结构化输出)
+- **supervisor 多智能体**:审核拆成 4 个专家(违约金 / 责任 / 付款 / 争议),supervisor 串行派工,embedding 去重
 
 ## 目录结构
 
@@ -25,6 +26,7 @@ contract-review-agent/
 │       ├── tools.py        # search_law / query_case 检索工具
 │       ├── ocr.py          # RapidOCR 图片识别
 │       ├── graph.py        # LangGraph 四节点图(嵌套 agent + 条件边 + checkpointer)
+│       ├── supervisor.py   # supervisor 多智能体图(4 专家 + 动态派工 + 去重 + 转人工)
 │       └── main.py         # CLI 入口(两阶段 invoke,处理中断/恢复)
 ├── data/           # civil_code.jsonl 民法典全文
 ├── samples/        # 示例合同
@@ -43,17 +45,29 @@ uv run python -m contract_review.main samples/contract.png
 
 # 或直接传文本
 uv run python -m contract_review.main --text "甲方委托乙方开发系统,乙方每逾期一日按合同总金额千分之五支付违约金。"
+
+# supervisor 多智能体版(4 专家分工审核)
+uv run python -m contract_review.supervisor samples/contract.txt
 ```
 
 ## 图结构
 
+单 agent 版(默认):
 ```
 START → extract_contract → review_risks → human_review ─(确认)─→ generate_report → END
                                             └────────(驳回)─→ END
 ```
 
+supervisor 多智能体版(审核拆 4 专家):
+```
+START → extract_contract → supervisor ⇄ {penalty / liability / payment / dispute}
+                                      └──(FINISH)──→ summarize → human_review ─(确认)─→ generate_report → END
+                                                                              └──(驳回)──→ END
+```
+
 - `extract_contract`:结构化抽取标的 / 签约方 / 金额 / 期限 / 关键条款
-- `review_risks`:内嵌 `create_agent`,自主调工具查证法条 / 判例,输出风险清单
+- `review_risks` / `supervisor` + 4 专家:两种审核实现——前者单个 agent 自主查证,后者调度员串行派工给 4 个专家
+- `summarize`:专家 findings 去重后,LLM 补整体等级 + 结论
 - `human_review`:高危风险 `interrupt` 挂起,人工确认 / 驳回
 - `generate_report`:纯 Python 拼装可读报告
 
@@ -65,4 +79,4 @@ START → extract_contract → review_risks → human_review ─(确认)─→ g
 - [x] LangSmith 追踪
 - [x] OCR 接入(RapidOCR,本地图片识别)
 - [x] PDF 支持(fitz/PyMuPDF 栅格化后再 OCR)
-- [ ] supervisor 多智能体
+- [x] supervisor 多智能体(4 专家 + 动态派工 + embedding 去重)

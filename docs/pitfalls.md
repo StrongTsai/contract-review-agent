@@ -89,3 +89,15 @@
 - **根因**:图挂了 `MemorySaver` 后,每次 `invoke` 都要指定「存到哪个会话」(`configurable.thread_id`),不传就没法持久化。
 - **解法**:`app.invoke(state, config={"configurable": {"thread_id": "1"}})`。
 - **教训**:checkpointer 是「状态外置」,`thread_id` 就是会话隔离的键;多用户时每个用户一个 `thread_id`。这也是 `main.py` 里要传 `config` 的原因。
+
+### 14. `if __name__ == "main"` 写错,CLI 静默退出
+- **现象**:`python -m contract_review.supervisor samples/contract.txt` 打印 `Loading weights` 后直接退出,无任何输出、无报错。
+- **根因**:入口守卫写成 `if __name__ == "main":`(少两个下划线)。直接运行脚本时 `__name__` 的值是 `"__main__"`,和 `"main"` 永不相等,条件恒为 False,`main()` 从未被调用 → import 完(触发 embedder 加载)就静默退出。
+- **解法**:`if __name__ == "__main__":`。
+- **教训**:`__main__` 是双下划线魔法常量,`"main"` 只是普通字符串,两者不相等。这是「入口守卫」的第二类变体(第一类是「忘了包守卫」,见前文 CLI 入口相关踩坑),两个都是「能 import 通过、但运行没反应」的静默故障。
+
+### 15. 用 clause 文本相似度去重,误杀「同条款不同风险点」
+- **现象**:去重后,同一条款的两个不同风险(如「赔偿全部损失」条款的「责任不对等」和「条款模糊」)只剩一个,真风险被吞。
+- **根因**:去重只看 clause(条款文本),把「同一条款」误当「同一风险点」;而「同一风险点」= 同一条款 + 同一个风险角度,后者要靠 risk_type 判。
+- **解法**:判据改两段式——`clause` 子串(同一条款)+ `risk_type` embedding 相似度(同一风险点),两个都命中才去重。
+- **教训**:去重语义是「风险点级」不是「条款级」;embedding 对长文本复述(如 reason)无区分度(共同词主导),短标签(如 risk_type)才有区分度。合同审核「宁漏勿杀」——多留一条是烦,少留一条是事故。

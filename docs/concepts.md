@@ -36,6 +36,12 @@
 - **为什么**:报告里要「第几条风险」,`for i, f in enumerate(review.findings, 1)` 让 i 从 1 开始,不用手写计数器。
 - **例子**:`for i, f in enumerate(findings, 1): print(f"{i}. {f}")` → `1. 第一条`。
 
+### `sorted(list, key=..., reverse=True)` + `lambda`(排序)
+- **是什么**:排序。`sorted(列表, key=函数, reverse=True)` 对每个元素调 `key` 函数拿一个「比较值」,按这个值排;`reverse=True` 降序(大的在前)。返回**新列表**,不改原列表。
+- **`lambda f: 表达式`**:匿名小函数,`f` 是入参(随便命名,代表「被排序的当前元素」),冒号后是返回值。等价于 `def 小函数(f): return 表达式`。
+- **为什么去重用**:去重是「保留第一条、后面重复的丢」,先按 `高=3>中=2>低=1` 降序排,重复的几条里留下的就是「高」那条;否则「中」可能排前、把「高」丢掉。
+- **例子**:`sorted(findings, key=lambda f: {"高":3,"中":2,"低":1}.get(f.severity, 0), reverse=True)` —— `dict.get(key, 默认值)` 查不到返回默认值(防 KeyError),这里把「高/中/低」换成「3/2/1」再排。
+
 ### `argparse`(命令行参数)
 - **是什么**:解析 `python main.py xxx --yyy` 这种命令行输入。
 - **为什么**:CLI 入口要区分「文件路径」(位置参数)和「直接传文本」(`--text` 可选参数)。

@@ -1,6 +1,6 @@
 # 合同审核数字员工 · 开发文档
 
-> 版本 v1.3 · 2026-09-16
+> 版本 v1.4 · 2026-09-19
 
 ## 1. 项目结构
 
@@ -16,6 +16,7 @@ contract-review-agent/
 │       ├── tools.py        # search_law / query_case 检索工具
 │       ├── ocr.py          # RapidOCR 图片识别(眼睛)
 │       ├── graph.py        # LangGraph 四节点图(含条件边 + checkpointer + 嵌套 agent)
+│       ├── supervisor.py   # supervisor 多智能体图(4 专家 + 动态派工 + 去重 + 转人工)
 │       └── main.py         # CLI 入口(两阶段 invoke,处理中断/恢复)
 ├── data/          # 语料数据(civil_code.jsonl 民法典全文)
 ├── .env           # 真实密钥(不入库)
@@ -47,6 +48,7 @@ cp .env.example .env   # 然后填入真实 DEEPSEEK_API_KEY 与 LANGCHAIN_API_K
 | tools.py | 检索工具 | `@tool` 的 `search_law`/`query_case`,调 `VectorStore.search` |
 | ocr.py | OCR 眼睛 | `@cache` + `RapidOCR`,图片 → 文本 |
 | graph.py | 四节点图 + 条件边 + 嵌套 agent | `create_agent`(review_risks 内)+ `interrupt` + `add_conditional_edges` + `MemorySaver` |
+| supervisor.py | supervisor 多智能体图 | 4 专家工厂 + supervisor 串行派工 + 去重 + interrupt 转人工 |
 | main.py | CLI,两阶段 invoke | `argparse` + `get_state` 检测中断 + `Command(resume)` |
 
 ## 4. 运行
@@ -55,6 +57,7 @@ cp .env.example .env   # 然后填入真实 DEEPSEEK_API_KEY 与 LANGCHAIN_API_K
 uv run python -m contract_review.main samples/contract.txt          # 文本文件输入
 uv run python -m contract_review.main samples/contract.png          # 图片输入(OCR 转文本)
 uv run python -m contract_review.main --text "甲方乙方...合同正文"   # 直接传文本
+uv run python -m contract_review.supervisor samples/contract.txt    # supervisor 多智能体版(4 专家分工)
 ```
 
 有高危风险时会暂停、打印风险点、等待输入 `y/n`;`y` 出报告,`n` 打印「已驳回,未生成报告」。
@@ -90,15 +93,19 @@ uv run python -c "from contract_review.graph import app; print(list(app.get_grap
 - [x] 语料升级为全量《民法典》(1260 条原文,data/civil_code.jsonl 加载,语义检索验证通过)
 - [x] OCR 接入:ocr.py(RapidOCR)+ main.py 按扩展名分图片/文本输入,端到端跑通 samples/contract.png
 - [x] src layout 重构:代码归入 src/contract_review/ 包,绝对导入,`python -m contract_review.main` 入口
+- [x] supervisor 多智能体:supervisor.py(4 专家工厂 + 串行派工 + 动态路由),端到端跑通
+- [x] 专家 findings 去重:clause 子串 + risk_type embedding 两段式,宁漏勿杀
+- [x] supervisor CLI 入口:复用 load_contract_text,支持 file / --text
 
 ## 7. 踩坑记录
 
-详见 [`docs/pitfalls.md`](pitfalls.md)(独立维护,写代码遇坑主动追加)。已覆盖 12 条,新增:OCR 按视觉行吐文本、naive join 切开换行处(#11)、PyMuPDF 弃用 fitz(#12)。
+详见 [`docs/pitfalls.md`](pitfalls.md)(独立维护,写代码遇坑主动追加)。已覆盖 15 条,新增:checkpointer 忘传 thread_id(#13)、`__name__ == "main"` 写错(#14)、clause 文本相似度去重误杀同条款不同风险点(#15)。
 
 ## 8. 后续开发计划
 
 1. ~~RAG 知识库 + 工具调用(agent 化)~~ ✅ 已完成:review 节点内嵌 create_agent,自主查证。
 2. ~~OCR 接入~~ ✅ 已完成:RapidOCR(ONNX 跑 PP-OCR 模型)本地识别图片。
 3. ~~PDF 支持~~ ✅ 已完成:fitz/PyMuPDF 栅格化 → OCR,端到端跑通 contract.pdf。
-4. supervisor 多智能体。
+4. ~~supervisor 多智能体~~ ✅ 已完成:supervisor.py(4 专家 + 串行派工 + embedding 去重 + 转人工)。
 5. LangSmith 追踪的 token/成本分析。
+6. supervisor 4 专家从串行派工改 `Send` 并行(当前串行,4 专家依次跑,慢)。
