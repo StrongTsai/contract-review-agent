@@ -1,6 +1,6 @@
 # 合同审核数字员工 · 开发文档
 
-> 版本 v1.4 · 2026-09-19
+> 版本 v1.5 · 2026-09-20
 
 ## 1. 项目结构
 
@@ -15,9 +15,11 @@ contract-review-agent/
 │       ├── knowledge.py    # 全量民法典 + 判例语料 + 向量检索(VectorStore)
 │       ├── tools.py        # search_law / query_case 检索工具
 │       ├── ocr.py          # RapidOCR 图片识别(眼睛)
-│       ├── graph.py        # LangGraph 四节点图(含条件边 + checkpointer + 嵌套 agent)
-│       ├── supervisor.py   # supervisor 多智能体图(4 专家 + 动态派工 + 去重 + 转人工)
-│       └── main.py         # CLI 入口(两阶段 invoke,处理中断/恢复)
+│       ├── graph.py                 # LangGraph 四节点图(单 agent 版:条件边 + checkpointer + 嵌套 agent)
+│       ├── experts.py               # 多智能体共享:4 专家 prompt/工厂 + 去重 + summarize
+│       ├── supervisor.py            # supervisor 多智能体(串行派工)
+│       ├── supervisor_parallel.py   # supervisor 多智能体(Send 并行派工)
+│       └── main.py                  # CLI 入口(两阶段 invoke,处理中断/恢复)
 ├── data/          # 语料数据(civil_code.jsonl 民法典全文)
 ├── .env           # 真实密钥(不入库)
 ├── .env.example   # 密钥模板(占位符)
@@ -48,7 +50,9 @@ cp .env.example .env   # 然后填入真实 DEEPSEEK_API_KEY 与 LANGCHAIN_API_K
 | tools.py | 检索工具 | `@tool` 的 `search_law`/`query_case`,调 `VectorStore.search` |
 | ocr.py | OCR 眼睛 | `@cache` + `RapidOCR`,图片 → 文本 |
 | graph.py | 四节点图 + 条件边 + 嵌套 agent | `create_agent`(review_risks 内)+ `interrupt` + `add_conditional_edges` + `MemorySaver` |
-| supervisor.py | supervisor 多智能体图 | 4 专家工厂 + supervisor 串行派工 + 去重 + interrupt 转人工 |
+| experts.py | 多智能体共享模块 | 4 专家 prompt + `make_expert` 工厂 + `dedup_findings` 去重 + `summarize` |
+| supervisor.py | supervisor 多智能体(串行) | supervisor 循环派工(`next` 单个 + `completed` 追踪)|
+| supervisor_parallel.py | supervisor 多智能体(并行) | supervisor 一次列专家 + `Send` 扇出 + 4 专家并发 |
 | main.py | CLI,两阶段 invoke | `argparse` + `get_state` 检测中断 + `Command(resume)` |
 
 ## 4. 运行
@@ -57,7 +61,8 @@ cp .env.example .env   # 然后填入真实 DEEPSEEK_API_KEY 与 LANGCHAIN_API_K
 uv run python -m contract_review.main samples/contract.txt          # 文本文件输入
 uv run python -m contract_review.main samples/contract.png          # 图片输入(OCR 转文本)
 uv run python -m contract_review.main --text "甲方乙方...合同正文"   # 直接传文本
-uv run python -m contract_review.supervisor samples/contract.txt    # supervisor 多智能体版(4 专家分工)
+uv run python -m contract_review.supervisor samples/contract.txt            # supervisor 多智能体(串行派工)
+uv run python -m contract_review.supervisor_parallel samples/contract.txt   # supervisor 多智能体(Send 并行派工)
 ```
 
 有高危风险时会暂停、打印风险点、等待输入 `y/n`;`y` 出报告,`n` 打印「已驳回,未生成报告」。
@@ -96,10 +101,12 @@ uv run python -c "from contract_review.graph import app; print(list(app.get_grap
 - [x] supervisor 多智能体:supervisor.py(4 专家工厂 + 串行派工 + 动态路由),端到端跑通
 - [x] 专家 findings 去重:clause 子串 + risk_type embedding 两段式,宁漏勿杀
 - [x] supervisor CLI 入口:复用 load_contract_text,支持 file / --text
+- [x] supervisor 拆公共模块:experts.py(专家/去重/summarize),串行并行共用
+- [x] Send 并行派工:supervisor_parallel.py,supervisor 一次列专家 + Send 扇出 4 专家并发
 
 ## 7. 踩坑记录
 
-详见 [`docs/pitfalls.md`](pitfalls.md)(独立维护,写代码遇坑主动追加)。已覆盖 15 条,新增:checkpointer 忘传 thread_id(#13)、`__name__ == "main"` 写错(#14)、clause 文本相似度去重误杀同条款不同风险点(#15)。
+详见 [`docs/pitfalls.md`](pitfalls.md)(独立维护,写代码遇坑主动追加)。已覆盖 16 条,新增:checkpointer 忘传 thread_id(#13)、`__name__ == "main"` 写错(#14)、clause 文本相似度去重误杀同条款不同风险点(#15)、`Send` 空 dict 分支拿不到父 state(#16)。
 
 ## 8. 后续开发计划
 
@@ -108,4 +115,4 @@ uv run python -c "from contract_review.graph import app; print(list(app.get_grap
 3. ~~PDF 支持~~ ✅ 已完成:fitz/PyMuPDF 栅格化 → OCR,端到端跑通 contract.pdf。
 4. ~~supervisor 多智能体~~ ✅ 已完成:supervisor.py(4 专家 + 串行派工 + embedding 去重 + 转人工)。
 5. LangSmith 追踪的 token/成本分析。
-6. supervisor 4 专家从串行派工改 `Send` 并行(当前串行,4 专家依次跑,慢)。
+6. ~~supervisor 4 专家从串行派工改 `Send` 并行~~ ✅ 已完成:supervisor_parallel.py(Send 扇出,supervisor 只跑一次)。

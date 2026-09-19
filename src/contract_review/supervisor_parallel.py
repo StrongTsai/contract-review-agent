@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
-from langgraph.types import Command
+from langgraph.types import Command, Send
 
 import operator
 import argparse
@@ -17,67 +17,56 @@ from contract_review.main import load_contract_text
 from contract_review import experts
 
 
-class SupervisorState(TypedDict, total=False):
+class SupervisorParallelState(TypedDict, total=False):
     contract_text: str
     contract_info: ContractInfo
     findings: Annotated[list[RiskFinding], operator.add]
-    next: str
     review: ReviewResult
     report: str
     human_decision: str
-    completed: Annotated[list[str], operator.add]
+    experts: list[str]
 
 
 class Route(BaseModel):
-    next: Literal["penalty_expert", "liability_expert", "payment_expert", "dispute_expert", "FINISH"]
+    experts: list[Literal["penalty_expert", "liability_expert", "payment_expert", "dispute_expert"]]
 
 
-SUPERVISOR_SYSTEM = """你是合同审核的调度员。基于合同原文和已发现的风险,决定下一个派哪个专家或收工。
+SUPERVISOR_PARALLEL_SYSTEM = """你是合同审核的调度员。基于合同原文和已发现的风险,决定下一个派哪个专家或收工。
   可选专家:
   - penalty_expert:违约金/罚则条款
   - liability_expert:责任承担/免责/赔偿条款
   - payment_expert:付款/验收/交付条款
   - dispute_expert:管辖/争议解决/法律适用条款
   规则:
-  - 每个专家只派一次,已派过的(看"已派过的专家")不要再派。
-  - 合同里还有哪类条款没审,就派对应的专家。
-  - 所有相关专家都派完,输出 FINISH。
+  - 理解合同信息，一次列出所有你认为需要派的专家
   """
 
-
-def supervisor(state: SupervisorState) -> dict:
+def supervisor_parallel(state: SupervisorParallelState) -> dict:
     model = get_model().with_structured_output(Route, method="function_calling")
-    found = state.get("findings", [])
-    completed = state.get("completed", [])
-    found_text = "\n".join(f"- {f.risk_type}" for f in found) or "（暂无）"
-    completed_text = "、".join(completed) or "（尚未派工）"
     route = model.invoke(
         [
-            SystemMessage(content=SUPERVISOR_SYSTEM),
-            HumanMessage(content=f"合同原文: \n{state['contract_text']}\n\n已派过的专家: {completed_text}\n已发现的风险类型:\n{found_text}")
+            SystemMessage(content=SUPERVISOR_PARALLEL_SYSTEM),
+            HumanMessage(content=f"合同原文: \n{state['contract_text']}\n\n")
         ]
     )
-    return {"next": route.next}
+    print(f"派出的专家: {route.experts}")
+    return {"experts": route.experts}
 
 
-def track_completed(expert, name: str):
-    def wrapped(state):
-        out = expert(state)
-        out["completed"] = [name]
-        return out
-    return wrapped
+def route_after_supervisor(state: SupervisorParallelState):
+    return [Send(name, {"contract_text": state["contract_text"]}) for name in state["experts"]]
 
 
-penalty_expert = track_completed(experts.penalty_expert, "penalty_expert")
-liability_expert = track_completed(experts.liability_expert, "liability_expert")
-payment_expert = track_completed(experts.payment_expert, "payment_expert")
-dispute_expert = track_completed(experts.dispute_expert, "dispute_expert")
+penalty_expert = experts.penalty_expert
+liability_expert = experts.liability_expert
+payment_expert = experts.payment_expert
+dispute_expert = experts.dispute_expert
 
 
-graph = StateGraph(state_schema=SupervisorState)
+graph = StateGraph(state_schema=SupervisorParallelState)
 
 graph.add_node("extract_contract", extract_contract)
-graph.add_node("supervisor", supervisor)
+graph.add_node("supervisor_parallel", supervisor_parallel)
 graph.add_node("penalty_expert", penalty_expert)
 graph.add_node("liability_expert", liability_expert)
 graph.add_node("payment_expert", payment_expert)
@@ -87,22 +76,15 @@ graph.add_node("human_review", human_review)
 graph.add_node("generate_report", generate_report)
 
 graph.add_edge(START, "extract_contract")
-graph.add_edge("extract_contract", "supervisor")
+graph.add_edge("extract_contract", "supervisor_parallel")
 graph.add_conditional_edges(
-    "supervisor",
-    lambda state: state["next"],
-    {
-        "penalty_expert": "penalty_expert",
-        "liability_expert": "liability_expert",
-        "payment_expert": "payment_expert",
-        "dispute_expert": "dispute_expert",
-        "FINISH": "summarize",
-    },
+    "supervisor_parallel",
+    route_after_supervisor
 )
-graph.add_edge("penalty_expert", "supervisor")     # 专家干完回 supervisor 再决策
-graph.add_edge("liability_expert", "supervisor")
-graph.add_edge("payment_expert", "supervisor")
-graph.add_edge("dispute_expert", "supervisor")
+graph.add_edge("penalty_expert", "summarize")     # 专家干完回 supervisor 再决策
+graph.add_edge("liability_expert", "summarize")
+graph.add_edge("payment_expert", "summarize")
+graph.add_edge("dispute_expert", "summarize")
 graph.add_edge("summarize", "human_review")
 graph.add_conditional_edges(
     "human_review",
@@ -146,7 +128,7 @@ def review_contract(contract_text: str) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="合同审核数字员工(多智能体版):输入合同文本,输出审核报告")
+    parser = argparse.ArgumentParser(description="合同审核数字员工(多智能体并行版):输入合同文本,输出审核报告")
     parser.add_argument("file", nargs="?", help="合同文件路径(.txt/.png/.pdf)")
     parser.add_argument("--text", help="直接传入合同文本(与 file 二选一)")
     args = parser.parse_args()

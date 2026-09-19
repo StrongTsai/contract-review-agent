@@ -101,3 +101,9 @@
 - **根因**:去重只看 clause(条款文本),把「同一条款」误当「同一风险点」;而「同一风险点」= 同一条款 + 同一个风险角度,后者要靠 risk_type 判。
 - **解法**:判据改两段式——`clause` 子串(同一条款)+ `risk_type` embedding 相似度(同一风险点),两个都命中才去重。
 - **教训**:去重语义是「风险点级」不是「条款级」;embedding 对长文本复述(如 reason)无区分度(共同词主导),短标签(如 risk_type)才有区分度。合同审核「宁漏勿杀」——多留一条是烦,少留一条是事故。
+
+### 16. `Send` 空 dict 扇出,分支节点拿不到父 state
+- **现象**:`python -m contract_review.supervisor_parallel` 报 `KeyError: 'contract_text'`,发生在 expert 节点。
+- **根因**:`Send(节点, arg)` 的第二个参数是**该分支节点收到的完整输入 state**,不是「额外增量」;传 `{}` 时,分支节点拿到的就是空 dict,读 `contract_text` 自然 KeyError。fan-out 出去的分支不会自动继承父节点的主 state。
+- **解法**:`Send(name, {"contract_text": state["contract_text"]})`,把该专家要用的字段显式塞进 arg。
+- **教训**:`Send` 的 arg 语义 = 分支的完整输入,不是 merge 增量;误当增量传空 dict 是第一次用 `Send` 的经典坑。
